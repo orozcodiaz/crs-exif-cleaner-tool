@@ -10,7 +10,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, anyhow};
-use eframe::egui::{self, Align, Color32, Layout, RichText, Stroke};
+use eframe::egui::{self, Align, Color32, Layout, RichText, Stroke, Vec2};
 use serde_json::Value;
 
 const BG: Color32 = Color32::from_rgb(245, 246, 248);
@@ -24,6 +24,7 @@ const ACCENT: Color32 = Color32::from_rgb(20, 105, 220);
 const FAIL: Color32 = Color32::from_rgb(196, 48, 48);
 const COL_COUNT: f32 = 64.0;
 const WINDOW_SIZE: f32 = 360.0;
+const FOOTER_HEIGHT: f32 = 34.0;
 
 /// Keys ExifCleaner removes before counting `Object.keys(...).length`.
 const IGNORED_COUNT_KEYS: &[&str] = &["SourceFile", "ImageSize", "Megapixels"];
@@ -70,6 +71,7 @@ struct CleanResult {
 struct CleanerApp {
     rows: Vec<FileRow>,
     next_id: u64,
+    stay_on_top: bool,
     result_tx: Sender<CleanResult>,
     result_rx: Receiver<CleanResult>,
 }
@@ -83,11 +85,19 @@ impl CleanerApp {
         visuals.widgets.noninteractive.bg_stroke = Stroke::NONE;
         visuals.widgets.noninteractive.fg_stroke = Stroke::new(1.0, TEXT);
         visuals.widgets.inactive.bg_fill = SURFACE;
+        visuals.widgets.inactive.fg_stroke = Stroke::new(1.0, Color32::from_rgb(170, 176, 186));
         visuals.widgets.hovered.bg_fill = DROP_HOVER;
-        visuals.selection.bg_fill = Color32::from_rgb(210, 228, 255);
+        visuals.widgets.hovered.fg_stroke = Stroke::new(1.0, ACCENT);
+        visuals.widgets.active.bg_fill = ACCENT;
+        visuals.widgets.active.fg_stroke = Stroke::new(1.0, ACCENT);
+        visuals.selection.bg_fill = ACCENT;
+        visuals.selection.stroke = Stroke::new(1.0, ACCENT);
         cc.egui_ctx.set_visuals(visuals);
         cc.egui_ctx.style_mut(|style| {
             style.spacing.scroll.floating = false;
+            style.spacing.icon_width = 16.0;
+            style.spacing.icon_width_inner = 10.0;
+            style.spacing.icon_spacing = 8.0;
             style.visuals.widgets.noninteractive.bg_stroke = Stroke::new(1.0, LINE);
         });
 
@@ -95,6 +105,7 @@ impl CleanerApp {
         Self {
             rows: Vec::new(),
             next_id: 0,
+            stay_on_top: false,
             result_tx,
             result_rx,
         }
@@ -164,22 +175,42 @@ impl eframe::App for CleanerApp {
                     .inner_margin(egui::Margin::same(16)),
             )
             .show(ctx, |ui| {
-                if self.rows.is_empty() || is_hovering {
-                    drop_zone(ui, is_hovering);
-                } else {
-                    egui::Frame::new()
-                        .fill(SURFACE)
-                        .stroke(Stroke::new(1.0, LINE))
-                        .corner_radius(10)
-                        .inner_margin(egui::Margin::symmetric(10, 6))
-                        .show(ui, |ui| {
-                            ui.set_min_size(ui.available_size());
-                            egui::ScrollArea::vertical()
-                                .auto_shrink([false, false])
+                let content_height =
+                    (ui.available_height() - FOOTER_HEIGHT - 10.0).max(120.0);
+
+                ui.allocate_ui_with_layout(
+                    Vec2::new(ui.available_width(), content_height),
+                    Layout::top_down(Align::Center),
+                    |ui| {
+                        if self.rows.is_empty() || is_hovering {
+                            drop_zone(ui, is_hovering);
+                        } else {
+                            egui::Frame::new()
+                                .fill(SURFACE)
+                                .stroke(Stroke::new(1.0, LINE))
+                                .corner_radius(10)
+                                .inner_margin(egui::Margin::symmetric(10, 6))
                                 .show(ui, |ui| {
-                                    file_table(ui, &self.rows);
+                                    ui.set_min_size(ui.available_size());
+                                    egui::ScrollArea::vertical()
+                                        .auto_shrink([false, false])
+                                        .show(ui, |ui| {
+                                            file_table(ui, &self.rows);
+                                        });
                                 });
-                        });
+                        }
+                    },
+                );
+
+                ui.add_space(10.0);
+                if stay_on_top_checkbox(ui, &mut self.stay_on_top) {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(
+                        if self.stay_on_top {
+                            egui::WindowLevel::AlwaysOnTop
+                        } else {
+                            egui::WindowLevel::Normal
+                        },
+                    ));
                 }
             });
 
@@ -191,6 +222,42 @@ impl eframe::App for CleanerApp {
             ctx.request_repaint_after(std::time::Duration::from_millis(60));
         }
     }
+}
+
+fn stay_on_top_checkbox(ui: &mut egui::Ui, stay_on_top: &mut bool) -> bool {
+    let mut changed = false;
+
+    ui.vertical_centered(|ui| {
+        let fill = if *stay_on_top {
+            Color32::from_rgb(232, 240, 255)
+        } else {
+            Color32::from_rgb(250, 251, 252)
+        };
+        let stroke = if *stay_on_top {
+            Stroke::new(1.0, Color32::from_rgb(180, 206, 245))
+        } else {
+            Stroke::new(1.0, LINE)
+        };
+
+        egui::Frame::new()
+            .fill(fill)
+            .stroke(stroke)
+            .corner_radius(8)
+            .inner_margin(egui::Margin::symmetric(14, 6))
+            .show(ui, |ui| {
+                let label = RichText::new("Stay on Top")
+                    .size(12.5)
+                    .color(if *stay_on_top { ACCENT } else { MUTED });
+
+                let response = ui.add(egui::Checkbox::new(stay_on_top, label));
+                if response.hovered() {
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                }
+                changed = response.changed();
+            });
+    });
+
+    changed
 }
 
 fn drop_zone(ui: &mut egui::Ui, is_hovering: bool) {
