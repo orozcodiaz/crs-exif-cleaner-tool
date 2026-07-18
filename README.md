@@ -20,18 +20,33 @@ Or point `EXIFTOOL_PATH` at any ExifTool binary on your machine.
 ## Run locally
 
 ```sh
+./scripts/fetch-exiftool.sh   # once
 cargo run --release
 ```
 
-## Build a macOS app
+## Make a copyable app
 
 ```sh
-./scripts/fetch-exiftool.sh
-cargo install cargo-bundle
+./scripts/fetch-exiftool.sh   # once, if needed
+cargo install cargo-bundle    # once
 cargo bundle --release
 ```
 
-The app is written to `target/release/bundle/osx/CRS EXIF Cleaner.app`.
+Then copy either:
+
+- **macOS app:** `target/release/bundle/osx/CRS EXIF Cleaner.app`  
+  (or from `dist/CRS EXIF Cleaner.app` if you copied it there)
+- **DMG:** `target/release/bundle/dmg/CRS EXIF Cleaner.dmg`
+
+Or a portable folder (binary + ExifTool side by side):
+
+```sh
+mkdir -p dist/portable/resources
+cp target/release/exif-cleaner "dist/portable/CRS EXIF Cleaner"
+cp -R resources/exiftool dist/portable/resources/
+```
+
+Copy the whole `dist/portable` folder — the binary alone is not enough; it needs `resources/exiftool/`.
 
 ## Important
 

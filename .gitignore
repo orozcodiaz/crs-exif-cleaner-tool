@@ -1,5 +1,6 @@
 # Rust build output
 /target/
+/dist/
 
 # Vendored ExifTool payload (keep the directory via .keep)
 /resources/exiftool/*

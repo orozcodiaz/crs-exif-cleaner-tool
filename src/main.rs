@@ -395,8 +395,9 @@ fn find_exiftool() -> Result<PathBuf> {
     {
         candidates.push(dir.join("exiftool"));
         candidates.push(dir.join("resources/exiftool/exiftool"));
-        // macOS .app: Contents/MacOS/../Resources/exiftool/exiftool
+        // macOS .app (cargo-bundle): Contents/MacOS → Contents/Resources/...
         candidates.push(dir.join("../Resources/exiftool/exiftool"));
+        candidates.push(dir.join("../Resources/resources/exiftool/exiftool"));
     }
 
     // Dev builds: resources next to Cargo.toml
