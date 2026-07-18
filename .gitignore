@@ -1,0 +1,17 @@
+# Rust build output
+/target/
+
+# Vendored ExifTool payload (keep the directory via .keep)
+/resources/exiftool/*
+!/resources/exiftool/.keep
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Editors / tooling
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
